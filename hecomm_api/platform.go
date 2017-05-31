@@ -270,6 +270,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 	}
 }
 
+//RequestLink Requester side of hecomm protocol
 func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 	config := tls.Config{Certificates: append([]tls.Certificate{pl.fogCredentials.Cert}, pl.cert)}
 
@@ -288,7 +289,78 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 			ReqDevEUI: deveui,
 		},
 	}
+	bytes, err := link.contract.GetBytes()
+	if err != nil {
+		return err
+	}
+	request, err := hecomm.NewMessage(hecomm.FPortLinkReq, bytes)
+	if err != nil {
+		return err
+	}
+
+	//Sending request
+	conn.Write(request)
+
 	for {
+		//Wait for response
+		n, err := conn.Read(buf)
+		if err != nil {
+			return err
+		}
+		//Decode response
+		message, err := hecomm.GetMessage(buf[:n])
+		if err != nil {
+			return err
+		}
+
+		switch message.FPort {
+		case hecomm.FPortLinkReq:
+			//Expecting response with provider identification
+			lc, err := message.GetLinkContract()
+			if err != nil {
+				return err
+			}
+			//Add providder identification to linkcontract
+			if lc.ProvDevEUI == nil {
+				return fmt.Errorf("Expected an non nil provider deveui")
+			}
+			link.contract.ProvDevEUI = lc.ProvDevEUI
+
+			//Startup PK
+			err = alice(&link, conn, buf)
+			if err != nil {
+				return err
+			}
+			//Key has been established --> thus linked
+			link.contract.Linked = true
+
+			//Send set
+			//Encode lc
+			bytes, err = link.contract.GetBytes()
+			if err != nil {
+				return err
+			}
+			//Create hecomm message
+			setReq, err := hecomm.NewMessage(hecomm.FPortLinkSet, bytes)
+			if err != nil {
+				return err
+			}
+			//Send the hecomm message
+			conn.Write(setReq)
+
+		case hecomm.FPortResponse:
+			resp, err := message.GetResponse()
+			if err != nil {
+				return err
+			}
+			if resp.OK {
+				pl.nodes[string(link.contract.ReqDevEUI[:])].Link = link
+			} else {
+				return fmt.Errorf("Hecomm protocol SET response failed")
+			}
+		default:
+			return fmt.Errorf("Unkown or unsupported FPORT: %v", message.FPort)
+		}
 
 	}
 }
