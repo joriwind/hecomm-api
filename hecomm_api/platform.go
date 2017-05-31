@@ -354,7 +354,13 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 				return err
 			}
 			if resp.OK {
+				//Set link to node
 				pl.nodes[string(link.contract.ReqDevEUI[:])].Link = link
+				//Push the key down to the fog
+				err := pl.api.pushKey(link.contract.ReqDevEUI, link.osSKey[:])
+				if err != nil {
+					return err
+				}
 			} else {
 				return fmt.Errorf("Hecomm protocol SET response failed")
 			}
