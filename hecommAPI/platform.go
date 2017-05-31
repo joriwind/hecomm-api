@@ -1,4 +1,4 @@
-package hecomm_api
+package hecommAPI
 
 import (
 	"context"
