@@ -8,6 +8,7 @@ import (
 
 	"fmt"
 
+	"github.com/joriwind/hecomm-api/hecomm"
 	"github.com/monnand/dhkx"
 )
 
@@ -18,44 +19,60 @@ const (
 
 //Platform Struct defining the hecomm server
 type Platform struct {
-	ctx         context.Context
-	address     string
-	credentials tls.Certificate
+	ctx            context.Context
+	address        string
+	cert           tls.Certificate
+	nodes          map[string]*nodeType
+	api            PlatformAPI
+	fogCredentials FogType
 }
 
-type fog struct{
+//FogType Defines the credentials of the fog
+type FogType struct {
 	Address string
-	TlsConfig tls.Config
+	Cert    tls.Certificate
+	CA      tls.Certificate
 }
-const (
-	FogCredentials fog = fog{
-		Address: "192.168.0.1",
-		TlsConfig: tls.Config{
 
-		},
-	}
-)
+//nodeType Used to define the nodes linked to the hecomm system
+type nodeType struct {
+	DevEUI []byte
+	Link   linkType
+}
 
-//Link A link between node and the contract
-type Link struct {
-	linkContract hecomm.LinkContract
-	osSKey       [KeySize]byte
+//linkType A link between node and the contract
+type linkType struct {
+	contract hecomm.LinkContract
+	osSKey   [KeySize]byte
+}
+
+//PlatformAPI Used to communicate with the IoT platform
+type PlatformAPI interface {
+	pushKey(deveui []byte, key []byte) error
 }
 
 //NewPlatform Create new hecomm server API
-func NewPlatform(ctx context.Context, address string, credentials tls.Certificate) (*Platform, error) {
-	var srv Platform
+func NewPlatform(ctx context.Context, address string, cert tls.Certificate, nodes [][]byte, api PlatformAPI) (*Platform, error) {
+	var pl Platform
 
-	srv.ctx = ctx
-	srv.address = address
-	srv.credentials = credentials
+	pl.ctx = ctx
+	pl.address = address
+	pl.cert = cert
+	for i, val := range nodes {
+		pl.nodes[string(nodes[i])] = &nodeType{DevEUI: val}
+	}
+	pl.api = api
 
-	return &srv, nil
+	pl.fogCredentials = FogType{
+		Address: "192.168.0.1",
+	}
+
+	return &pl, nil
 }
 
 //Start Start listening
 func (pl *Platform) Start() error {
-	config := tls.Config{Certificates: []tls.Certificate{pl.credentials}}
+	config := tls.Config{Certificates: []tls.Certificate{pl.cert}}
 	listener, err := tls.Listen("tcp", "localhost:8000", &config)
 	if err != nil {
 		return err
@@ -79,7 +96,7 @@ func (pl *Platform) Start() error {
 		//Check if connection available or context
 		select {
 		case conn := <-chanConn:
-			if conn.RemoteAddr().String() == FogCredentials.Address {
+			if conn.RemoteAddr().String() == pl.fogCredentials.Address {
 				pl.handleProviderConnection(conn)
 			} else {
 				log.Printf("hecommplatform server: wrong connection: %v\n", conn)
@@ -95,15 +112,8 @@ func (pl *Platform) Start() error {
 func (pl *Platform) handleProviderConnection(conn net.Conn) {
 	buf := make([]byte, 2048)
 
-	//Get the storage pointer
-	var store *storage.Storage
-	store, ok := pl.ctx.Value(main.keyStorageID).(*storage.Storage)
-	if !ok {
-		log.Fatalf("Could not assert storage!: %v", pl.ctx.Value("storage"))
-	}
-
 	//The to be created link
-	var link Link
+	var link linkType
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -127,18 +137,10 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 				log.Printf("Unexpected LinkContract in LinkReq, is already linked: %v\n", lc)
 			}
 
-			//Convert eui
-			eui := ConvertHecommDevEUIToPlatformDevEUI(lc.ProvDevEUI)
-
-			//Find possible node
-			//TODO: locate node
-			node, ok := store.GetNode(eui)
-			if !ok {
-				log.Fatalf("hecommplatform server: handleConnection: could not resolve deveui: %v\n", err)
-				return
-			}
+			//Find the requested node
+			node, ok := pl.nodes[string(lc.ProvDevEUI[:])]
 			//Check if valid node is found --> node.DevEUI not nil or something
-			if node.DevEUI != eui {
+			if !ok {
 				log.Printf("hecommplatform server: handleconnection: could not find node\n")
 				rsp, err := hecomm.NewResponse(false)
 				if err != nil {
@@ -154,7 +156,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 			}
 
 			//Check if node already has connection!
-			if ok := node.Link.Linked; !ok {
+			if ok := node.Link.contract.Linked; !ok {
 				log.Printf("Unable to connect to this node, already connected: %v\n", lc)
 				rsp, err := hecomm.NewResponse(false)
 				if err != nil {
@@ -184,14 +186,14 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 
 			//Add to temp link
 			//Check if already started linking
-			if link.linkContract.ProvDevEUI != nil {
+			if link.contract.ProvDevEUI != nil {
 				log.Printf("Already start linking!?: Link: %v LinkContract: %v\n", link, lc)
 				break
 			}
-			link.linkContract = *lc
+			link.contract = *lc
 
 		case hecomm.FPortLinkState:
-			if link.linkContract.ProvDevEUI == nil {
+			if link.contract.ProvDevEUI == nil {
 				log.Printf("The link protocol has not started yet?: %v\n", link)
 			}
 			err := bob(&link, conn, *message)
@@ -207,11 +209,8 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 				log.Printf("hecommplatform server: handleConnection: unvalid LinkContract: error: %v\n", err)
 			}
 
-			//Convert identifier
-			eui := ConvertHecommDevEUIToPlatformDevEUI(lc.ProvDevEUI)
-
 			//Check corresponds with active linking
-			for index, b := range link.linkContract.ProvDevEUI {
+			for index, b := range link.contract.ProvDevEUI {
 				if b != lc.ProvDevEUI[index] {
 					log.Fatalf("LinkSet does not correspond with active link!: Link: %v, LinkSet: %v\n", link, lc)
 					return
@@ -226,9 +225,9 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 
 			//Push key to node
 			//Get corresponding node
-			node, ok := store.GetNode(eui)
+			node, ok := pl.nodes[string(lc.ProvDevEUI[:])]
 			if !ok {
-				log.Printf("get node error: %pl\n", err)
+				log.Printf("The node isn't available anymore?\n")
 
 				//Send bad response
 				bytes, err := hecomm.NewResponse(false)
@@ -239,7 +238,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 				return
 			}
 			//Add item, pushing key down to node
-			err = cisixlowpan.SendCoapRequest(coap.POST, node.Addr, "/key", string(link.osSKey[:])
+			err = pl.api.pushKey(node.DevEUI, link.osSKey[:])
 			if err != nil {
 				fmt.Printf("hecommplatform server: failed to push osSKey: %v\n", err)
 
@@ -252,10 +251,10 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 				return
 			}
 			//Define link in state
-			pl.links[eui] = link
+			pl.nodes[string(node.DevEUI)].Link = link
 			log.Printf("Link is set: %v\n", link)
 			//Clear link
-			link = Link{}
+			link = linkType{}
 
 			//Send ok response
 			bytes, err := hecomm.NewResponse(true)
@@ -271,29 +270,22 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 	}
 }
 
-func (pl *Platform) RequestLink(node storage.Node, infType int){
-	config := tls.Config{Certificates: append(FogCredentials.TlsConfig.Certificates, tls.Certificate{pl.credentials})}
+func (pl *Platform) RequestLink(deveui []byte, infType int) error {
+	config := tls.Config{Certificates: append([]tls.Certificate{pl.fogCredentials.Cert}, pl.cert)}
 
-	conn, err := tls.Dial("tcp", FogCredentials.Address, &config)
+	conn, err := tls.Dial("tcp", pl.fogCredentials.Address, &config)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	
+
 	buf := make([]byte, 2048)
 
-	//Get the storage pointer
-	var store *storage.Storage
-	store, ok := pl.ctx.Value(main.keyStorageID).(*storage.Storage)
-	if !ok {
-		log.Fatalf("Could not assert storage!: %v", pl.ctx.Value("storage"))
-	}
-
 	//The to be created link
-	link := Link{
-		linkContract: hecomm.LinkContract{
-			InfType: infType,
-			ReqDevEUI: []byte(node.DevEUI)
+	link := linkType{
+		contract: hecomm.LinkContract{
+			InfType:   infType,
+			ReqDevEUI: deveui,
 		},
 	}
 	for {
@@ -302,7 +294,7 @@ func (pl *Platform) RequestLink(node storage.Node, infType int){
 }
 
 //alice Initiator side from DH perspective
-func alice(link *Link, conn net.Conn, buf []byte) error {
+func alice(link *linkType, conn net.Conn, buf []byte) error {
 	//Get default group
 	g, err := dhkx.GetGroup(0)
 	if err != nil {
@@ -354,7 +346,7 @@ func alice(link *Link, conn net.Conn, buf []byte) error {
 }
 
 //bob Receiver side form DH perspective, linkstate message already received
-func bob(link *Link, conn net.Conn, message hecomm.Message) error {
+func bob(link *linkType, conn net.Conn, message hecomm.Message) error {
 	g, err := dhkx.GetGroup(0)
 	if err != nil {
 		//log.Fatalf("Could not create group(DH): %v\n", err)
