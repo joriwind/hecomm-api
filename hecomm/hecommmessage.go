@@ -5,37 +5,43 @@ import (
 	"fmt"
 )
 
+//FPortT Defines the possible fports
+type FPortT int
+
 /*
  * hecomm communication definition
  * FPort: 0: DB Command, 10: LinkReq, 50: PK link state, 100: LinkSet, 200: response
  */
 const (
-	FPortDBCommand int = 0
-	FPortLinkReq   int = 10
-	FPortLinkState int = 50
-	FPortLinkSet   int = 100
-	FPortResponse  int = 200
+	FPortDBCommand FPortT = 0
+	FPortLinkReq   FPortT = 10
+	FPortLinkState FPortT = 50
+	FPortLinkSet   FPortT = 100
+	FPortResponse  FPortT = 200
 )
+
+//ETypeT Defines the element types possible
+type ETypeT int
 
 /*
  *	Definition of valid EType values
  */
 const (
-	ETypeNode int = iota + 1
+	ETypeNode ETypeT = iota + 1
 	ETypePlatform
 	ETypeLink
 )
 
 //Message Structure of top message
 type Message struct {
-	FPort int
+	FPort FPortT
 	Data  []byte
 }
 
 //DBCommand Structure of Data (DBCommand)
 type DBCommand struct {
 	Insert bool
-	EType  int
+	EType  ETypeT
 	Data   []byte
 }
 
@@ -52,12 +58,6 @@ type Response struct {
 	OK bool
 }
 
-const (
-	eTypeNode int = iota + 1
-	eTypePlatform
-	eTypeLink
-)
-
 //GetMessage Convert byte slice to HecommMessage
 func GetMessage(buf []byte) (*Message, error) {
 	var message Message
@@ -69,7 +69,7 @@ func GetMessage(buf []byte) (*Message, error) {
 }
 
 //NewMessage Create own Hecomm message
-func NewMessage(fPort int, data []byte) ([]byte, error) {
+func NewMessage(fPort FPortT, data []byte) ([]byte, error) {
 	var message Message
 	//Compile message
 	message.FPort = fPort
@@ -91,7 +91,7 @@ func NewResponse(result bool) ([]byte, error) {
 }
 
 //NewDBCommand create new dbcommand message
-func NewDBCommand(insert bool, eType int, data []byte) ([]byte, error) {
+func NewDBCommand(insert bool, eType ETypeT, data []byte) ([]byte, error) {
 	dbcommand := DBCommand{
 		Insert: insert,
 		EType:  eType,
@@ -107,7 +107,7 @@ func NewDBCommand(insert bool, eType int, data []byte) ([]byte, error) {
 }
 
 //NewLinkContract Create new LinkContract message
-func NewLinkContract(fPort int, reqdev []byte, provdev []byte, inftype int, linked bool) ([]byte, error) {
+func NewLinkContract(fPort FPortT, reqdev []byte, provdev []byte, inftype int, linked bool) ([]byte, error) {
 	lc := LinkContract{
 		InfType:    inftype,
 		Linked:     linked,
