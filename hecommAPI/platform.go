@@ -27,13 +27,6 @@ type Platform struct {
 	fogCredentials FogType
 }
 
-//FogType Defines the credentials of the fog
-type FogType struct {
-	Address string
-	Cert    tls.Certificate
-	CA      tls.Certificate
-}
-
 //nodeType Used to define the nodes linked to the hecomm system
 type nodeType struct {
 	DevEUI []byte
