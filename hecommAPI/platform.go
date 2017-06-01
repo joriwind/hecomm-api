@@ -23,7 +23,7 @@ type Platform struct {
 	address        string
 	cert           tls.Certificate
 	nodes          map[string]*nodeType
-	api            PlatformAPI
+	pushKey        func(deveui []byte, key []byte) error
 	fogCredentials FogType
 }
 
@@ -46,13 +46,8 @@ type linkType struct {
 	osSKey   [KeySize]byte
 }
 
-//PlatformAPI Used to communicate with the IoT platform
-type PlatformAPI interface {
-	pushKey(deveui []byte, key []byte) error
-}
-
 //NewPlatform Create new hecomm server API
-func NewPlatform(ctx context.Context, address string, cert tls.Certificate, nodes [][]byte, api PlatformAPI) (*Platform, error) {
+func NewPlatform(ctx context.Context, address string, cert tls.Certificate, nodes [][]byte, callback func(deveui []byte, key []byte) error) (*Platform, error) {
 	var pl Platform
 
 	pl.ctx = ctx
@@ -61,7 +56,7 @@ func NewPlatform(ctx context.Context, address string, cert tls.Certificate, node
 	for i, val := range nodes {
 		pl.nodes[string(nodes[i])] = &nodeType{DevEUI: val}
 	}
-	pl.api = api
+	pl.pushKey = callback
 
 	pl.fogCredentials = FogType{
 		Address: "192.168.0.1",
@@ -238,7 +233,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 				return
 			}
 			//Add item, pushing key down to node
-			err = pl.api.pushKey(node.DevEUI, link.osSKey[:])
+			err = pl.pushKey(node.DevEUI, link.osSKey[:])
 			if err != nil {
 				fmt.Printf("hecommplatform server: failed to push osSKey: %v\n", err)
 
@@ -357,7 +352,7 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 				//Set link to node
 				pl.nodes[string(link.contract.ReqDevEUI[:])].Link = link
 				//Push the key down to the fog
-				err := pl.api.pushKey(link.contract.ReqDevEUI, link.osSKey[:])
+				err := pl.pushKey(link.contract.ReqDevEUI, link.osSKey[:])
 				if err != nil {
 					return err
 				}
