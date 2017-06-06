@@ -9,17 +9,15 @@ import (
 )
 
 //FogType Defines the credentials of the fog
-type FogType struct {
-	Address string
-	Cert    tls.Certificate
-	CA      tls.Certificate
-}
+const (
+	fogAddress string = "192.168.1.1:2000"
+)
 
 //RegisterNodes Register the nodes in the fog implementation
-func RegisterNodes(nodes []hecomm.DBCNode, fog FogType) error {
-	config := tls.Config{Certificates: []tls.Certificate{fog.Cert}}
+func RegisterNodes(nodes []hecomm.DBCNode) error {
+	config := tls.Config{}
 
-	conn, err := tls.Dial("tcp", fog.Address, &config)
+	conn, err := tls.Dial("tcp", fogAddress, &config)
 	if err != nil {
 		return err
 	}
@@ -46,10 +44,10 @@ func RegisterNodes(nodes []hecomm.DBCNode, fog FogType) error {
 }
 
 //RegisterPlatform Register the platform in the fog implementation
-func RegisterPlatform(pl hecomm.DBCPlatform, fog FogType) error {
-	config := tls.Config{Certificates: []tls.Certificate{fog.Cert}}
+func RegisterPlatform(pl hecomm.DBCPlatform) error {
+	config := tls.Config{}
 
-	conn, err := tls.Dial("tcp", fog.Address, &config)
+	conn, err := tls.Dial("tcp", fogAddress, &config)
 	if err != nil {
 		return err
 	}

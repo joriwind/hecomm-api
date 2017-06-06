@@ -19,12 +19,11 @@ const (
 
 //Platform Struct defining the hecomm server
 type Platform struct {
-	ctx            context.Context
-	address        string
-	cert           tls.Certificate
-	nodes          map[string]*nodeType
-	pushKey        func(deveui []byte, key []byte) error
-	fogCredentials FogType
+	ctx     context.Context
+	address string
+	cert    tls.Certificate
+	nodes   map[string]*nodeType
+	pushKey func(deveui []byte, key []byte) error
 }
 
 //nodeType Used to define the nodes linked to the hecomm system
@@ -50,10 +49,6 @@ func NewPlatform(ctx context.Context, address string, cert tls.Certificate, node
 		pl.nodes[string(nodes[i])] = &nodeType{DevEUI: val}
 	}
 	pl.pushKey = callback
-
-	pl.fogCredentials = FogType{
-		Address: "192.168.0.1",
-	}
 
 	return &pl, nil
 }
@@ -84,7 +79,7 @@ func (pl *Platform) Start() error {
 		//Check if connection available or context
 		select {
 		case conn := <-chanConn:
-			if conn.RemoteAddr().String() == pl.fogCredentials.Address {
+			if conn.RemoteAddr().String() == fogAddress {
 				pl.handleProviderConnection(conn)
 			} else {
 				log.Printf("hecommplatform server: wrong connection: %v\n", conn)
@@ -260,9 +255,9 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 
 //RequestLink Requester side of hecomm protocol
 func (pl *Platform) RequestLink(deveui []byte, infType int) error {
-	config := tls.Config{Certificates: append([]tls.Certificate{pl.fogCredentials.Cert}, pl.cert)}
+	config := tls.Config{Certificates: []tls.Certificate{pl.cert}}
 
-	conn, err := tls.Dial("tcp", pl.fogCredentials.Address, &config)
+	conn, err := tls.Dial("tcp", fogAddress, &config)
 	if err != nil {
 		return err
 	}
