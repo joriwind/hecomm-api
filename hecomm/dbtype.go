@@ -17,7 +17,6 @@ const (
 type DBCPlatform struct {
 	Address string
 	CI      CIType
-	CIArgs  map[string]interface{}
 }
 
 //DBCNode the struct used to pass information about a node
