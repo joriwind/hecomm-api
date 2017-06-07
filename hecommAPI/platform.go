@@ -56,7 +56,7 @@ func NewPlatform(ctx context.Context, address string, cert tls.Certificate, node
 //Start Start listening
 func (pl *Platform) Start() error {
 	config := tls.Config{Certificates: []tls.Certificate{pl.cert}}
-	listener, err := tls.Listen("tcp", "localhost:8000", &config)
+	listener, err := tls.Listen("tcp", pl.address, &config)
 	if err != nil {
 		return err
 	}
