@@ -5,6 +5,13 @@ import (
 
 	"encoding/json"
 
+	"net"
+
+	"fmt"
+	"io"
+
+	"log"
+
 	"github.com/joriwind/hecomm-api/hecomm"
 )
 
@@ -30,12 +37,14 @@ func RegisterNodes(nodes []hecomm.DBCNode, config *tls.Config) error {
 		if err != nil {
 			return err
 		}
-		bytes, err = hecomm.NewMessage(hecomm.FPortDBCommand, bytes)
-		if err != nil {
-			return err
-		}
 
+		log.Printf("Registering node: %v\n", node)
 		conn.Write(bytes)
+	}
+
+	err = waitForResponse(conn)
+	if err != nil {
+		return nil
 	}
 
 	return nil
@@ -57,12 +66,42 @@ func RegisterPlatform(pl hecomm.DBCPlatform, config *tls.Config) error {
 	if err != nil {
 		return err
 	}
-	bytes, err = hecomm.NewMessage(hecomm.FPortDBCommand, bytes)
+
+	log.Printf("Registering platform: %v\n", pl)
+
+	conn.Write(bytes)
+
+	err = waitForResponse(conn)
 	if err != nil {
 		return err
 	}
 
-	conn.Write(bytes)
+	return nil
+}
+
+func waitForResponse(conn net.Conn) error {
+	buf := make([]byte, 2048)
+	n, err := conn.Read(buf)
+	if err != nil {
+		if err == io.EOF {
+			return fmt.Errorf("Connection closed by remote")
+		}
+		return err
+	}
+
+	m, err := hecomm.GetMessage(buf[:n])
+	if err != nil {
+		return err
+	}
+
+	rsp, err := m.GetResponse()
+	if err != nil {
+		return err
+	}
+
+	if rsp.OK != true {
+		return fmt.Errorf("Did not succeed: %v", rsp)
+	}
 
 	return nil
 }

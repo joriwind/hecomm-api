@@ -9,7 +9,7 @@ type CIType int
 
 //Defines the CIType's possible
 const (
-	CISixlowpan CIType = iota + 1
+	CISixlowpan CIType = iota
 	CILorawan
 )
 

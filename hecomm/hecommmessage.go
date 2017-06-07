@@ -27,7 +27,7 @@ type ETypeT int
  *	Definition of valid EType values
  */
 const (
-	ETypeNode ETypeT = iota + 1
+	ETypeNode ETypeT = iota
 	ETypePlatform
 	ETypeLink
 )
@@ -61,7 +61,7 @@ type Response struct {
 //GetMessage Convert byte slice to HecommMessage
 func GetMessage(buf []byte) (*Message, error) {
 	var message Message
-	err := json.Unmarshal(buf, message)
+	err := json.Unmarshal(buf, &message)
 	if err != nil {
 		return &message, err
 	}
@@ -126,10 +126,10 @@ func NewLinkContract(fPort FPortT, reqdev []byte, provdev []byte, inftype int, l
 //GetCommand Convert byte slice of HecommMessage into DBCommand struct
 func (m *Message) GetCommand() (*DBCommand, error) {
 	var command DBCommand
-	if m.FPort != 0 {
-		return &command, fmt.Errorf("Hecomm message: FPort not equal to response code: %v", m.FPort)
+	if m.FPort != FPortDBCommand {
+		return &command, fmt.Errorf("Hecomm message: FPort not equal to DBCommand code: %v", m.FPort)
 	}
-	err := json.Unmarshal(m.Data, command)
+	err := json.Unmarshal(m.Data, &command)
 	return &command, err
 }
 
@@ -144,9 +144,9 @@ func (m *DBCommand) GetBytes() ([]byte, error) {
 func (m *Message) GetLinkContract() (*LinkContract, error) {
 	var link LinkContract
 	if m.FPort != FPortLinkReq && m.FPort != FPortLinkSet {
-		return &link, fmt.Errorf("Hecomm message: FPort not equal to response code: %v", m.FPort)
+		return &link, fmt.Errorf("Hecomm message: FPort not equal to LinkContract code: %v", m.FPort)
 	}
-	err := json.Unmarshal(m.Data, link)
+	err := json.Unmarshal(m.Data, &link)
 	return &link, err
 }
 
@@ -160,10 +160,10 @@ func (m *LinkContract) GetBytes() ([]byte, error) {
 //GetResponse Convert byte slice of HecommMessage into Link struct
 func (m *Message) GetResponse() (*Response, error) {
 	var rsp Response
-	if m.FPort != 200 {
+	if m.FPort != FPortResponse {
 		return &rsp, fmt.Errorf("Hecomm message: FPort not equal to response code: %v", m.FPort)
 	}
-	err := json.Unmarshal(m.Data, rsp)
+	err := json.Unmarshal(m.Data, &rsp)
 	return &rsp, err
 }
 
