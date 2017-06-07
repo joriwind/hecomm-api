@@ -20,9 +20,9 @@ const (
 //Platform Struct defining the hecomm server
 type Platform struct {
 	ctx     context.Context
-	address string
-	config  *tls.Config
-	nodes   map[string]*nodeType
+	Address string
+	Config  *tls.Config
+	Nodes   map[string]*nodeType
 	pushKey func(deveui []byte, key []byte) error
 }
 
@@ -43,10 +43,10 @@ func NewPlatform(ctx context.Context, address string, config *tls.Config, nodes 
 	var pl Platform
 
 	pl.ctx = ctx
-	pl.address = address
-	pl.config = config
+	pl.Address = address
+	pl.Config = config
 	for i, val := range nodes {
-		pl.nodes[string(nodes[i])] = &nodeType{DevEUI: val}
+		pl.Nodes[string(nodes[i])] = &nodeType{DevEUI: val}
 	}
 	pl.pushKey = callback
 
@@ -55,7 +55,7 @@ func NewPlatform(ctx context.Context, address string, config *tls.Config, nodes 
 
 //Start Start listening
 func (pl *Platform) Start() error {
-	listener, err := tls.Listen("tcp", pl.address, pl.config)
+	listener, err := tls.Listen("tcp", pl.Address, pl.Config)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 			}
 
 			//Find the requested node
-			node, ok := pl.nodes[string(lc.ProvDevEUI[:])]
+			node, ok := pl.Nodes[string(lc.ProvDevEUI[:])]
 			//Check if valid node is found --> node.DevEUI not nil or something
 			if !ok {
 				log.Printf("hecommplatform server: handleconnection: could not find node\n")
@@ -207,7 +207,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 
 			//Push key to node
 			//Get corresponding node
-			node, ok := pl.nodes[string(lc.ProvDevEUI[:])]
+			node, ok := pl.Nodes[string(lc.ProvDevEUI[:])]
 			if !ok {
 				log.Printf("The node isn't available anymore?\n")
 
@@ -233,7 +233,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 				return
 			}
 			//Define link in state
-			pl.nodes[string(node.DevEUI)].Link = link
+			pl.Nodes[string(node.DevEUI)].Link = link
 			log.Printf("Link is set: %v\n", link)
 			//Clear link
 			link = linkType{}
@@ -254,7 +254,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 
 //RequestLink Requester side of hecomm protocol
 func (pl *Platform) RequestLink(deveui []byte, infType int) error {
-	conn, err := tls.Dial("tcp", fogAddress, pl.config)
+	conn, err := tls.Dial("tcp", fogAddress, pl.Config)
 	if err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 			}
 			if resp.OK {
 				//Set link to node
-				pl.nodes[string(link.contract.ReqDevEUI[:])].Link = link
+				pl.Nodes[string(link.contract.ReqDevEUI[:])].Link = link
 				//Push the key down to the fog
 				err := pl.pushKey(link.contract.ReqDevEUI, link.osSKey[:])
 				if err != nil {
