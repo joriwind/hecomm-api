@@ -21,7 +21,7 @@ const (
 type Platform struct {
 	ctx     context.Context
 	address string
-	cert    tls.Certificate
+	config  *tls.Config
 	nodes   map[string]*nodeType
 	pushKey func(deveui []byte, key []byte) error
 }
@@ -39,12 +39,12 @@ type linkType struct {
 }
 
 //NewPlatform Create new hecomm server API
-func NewPlatform(ctx context.Context, address string, cert tls.Certificate, nodes [][]byte, callback func(deveui []byte, key []byte) error) (*Platform, error) {
+func NewPlatform(ctx context.Context, address string, config *tls.Config, nodes [][]byte, callback func(deveui []byte, key []byte) error) (*Platform, error) {
 	var pl Platform
 
 	pl.ctx = ctx
 	pl.address = address
-	pl.cert = cert
+	pl.config = config
 	for i, val := range nodes {
 		pl.nodes[string(nodes[i])] = &nodeType{DevEUI: val}
 	}
@@ -55,8 +55,7 @@ func NewPlatform(ctx context.Context, address string, cert tls.Certificate, node
 
 //Start Start listening
 func (pl *Platform) Start() error {
-	config := tls.Config{Certificates: []tls.Certificate{pl.cert}}
-	listener, err := tls.Listen("tcp", pl.address, &config)
+	listener, err := tls.Listen("tcp", pl.address, pl.config)
 	if err != nil {
 		return err
 	}

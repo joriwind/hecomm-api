@@ -14,10 +14,8 @@ const (
 )
 
 //RegisterNodes Register the nodes in the fog implementation
-func RegisterNodes(nodes []hecomm.DBCNode) error {
-	config := tls.Config{}
-
-	conn, err := tls.Dial("tcp", fogAddress, &config)
+func RegisterNodes(nodes []hecomm.DBCNode, config *tls.Config) error {
+	conn, err := tls.Dial("tcp", fogAddress, config)
 	if err != nil {
 		return err
 	}
@@ -44,10 +42,8 @@ func RegisterNodes(nodes []hecomm.DBCNode) error {
 }
 
 //RegisterPlatform Register the platform in the fog implementation
-func RegisterPlatform(pl hecomm.DBCPlatform) error {
-	config := tls.Config{}
-
-	conn, err := tls.Dial("tcp", fogAddress, &config)
+func RegisterPlatform(pl hecomm.DBCPlatform, config *tls.Config) error {
+	conn, err := tls.Dial("tcp", fogAddress, config)
 	if err != nil {
 		return err
 	}
