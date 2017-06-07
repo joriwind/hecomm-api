@@ -254,9 +254,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 
 //RequestLink Requester side of hecomm protocol
 func (pl *Platform) RequestLink(deveui []byte, infType int) error {
-	config := tls.Config{Certificates: []tls.Certificate{pl.cert}}
-
-	conn, err := tls.Dial("tcp", fogAddress, &config)
+	conn, err := tls.Dial("tcp", fogAddress, pl.config)
 	if err != nil {
 		return err
 	}
