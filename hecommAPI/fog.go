@@ -44,7 +44,7 @@ func RegisterNodes(nodes []hecomm.DBCNode, config *tls.Config) error {
 
 	err = waitForResponse(conn)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil
@@ -98,8 +98,8 @@ func waitForResponse(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-
-	if rsp.OK != true {
+	log.Printf("Received %v response\n", rsp.OK)
+	if !rsp.OK {
 		return fmt.Errorf("Did not succeed: %v", rsp)
 	}
 
