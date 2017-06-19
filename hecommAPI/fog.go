@@ -30,10 +30,15 @@ func (pl *Platform) RegisterNodes(nodes []hecomm.DBCNode) error {
 
 	//Add nodes to hecomm platform server
 	for _, val := range nodes {
-		if val, ok := pl.Nodes[string(val.DevEUI)]; ok {
+		log.Printf("Checking deveui: %v\n", val.DevEUI)
+		if pl.Nodes == nil {
+			log.Fatalln("Unintilized map!")
+		}
+		if _, ok := pl.Nodes[string(val.DevEUI)]; ok {
 			log.Printf("Node already present in hecomm platform server: %v!", string(val.DevEUI))
 		} else {
-			pl.Nodes[string(val.DevEUI)] = &nodeType{DevEUI: val.DevEUI}
+			node := nodeType{DevEUI: val.DevEUI[:]}
+			pl.Nodes[string(val.DevEUI)] = &node
 		}
 	}
 
