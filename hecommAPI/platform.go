@@ -148,7 +148,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 			}
 
 			//Check if node already has connection!
-			if ok := node.Link.contract.Linked; !ok {
+			if ok := node.Link.contract.Linked; ok {
 				log.Printf("Unable to connect to this node, already connected: %v\n", lc)
 				rsp, err := hecomm.NewResponse(false)
 				if err != nil {
