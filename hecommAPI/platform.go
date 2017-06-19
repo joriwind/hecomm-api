@@ -45,6 +45,7 @@ func NewPlatform(ctx context.Context, address string, config *tls.Config, nodes 
 	pl.ctx = ctx
 	pl.Address = address
 	pl.Config = config
+	pl.Nodes = make(map[string]*nodeType)
 	for i, val := range nodes {
 		pl.Nodes[string(nodes[i])] = &nodeType{DevEUI: val}
 	}
