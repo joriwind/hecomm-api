@@ -351,7 +351,11 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 					return err
 				}
 			} else {
-				return fmt.Errorf("Hecomm protocol SET response failed")
+				if link.contract.Linked == true {
+					return fmt.Errorf("Hecomm protocol Set link failed")
+				} else {
+					return fmt.Errorf("Hecomm protocol Request link failed")
+				}
 			}
 		default:
 			return fmt.Errorf("Unkown or unsupported FPORT: %v", message.FPort)
