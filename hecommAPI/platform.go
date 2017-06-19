@@ -60,6 +60,7 @@ func (pl *Platform) Start() error {
 		return err
 	}
 	defer listener.Close()
+	log.Printf("Hecomm platform listening on: %v\n", pl.Address)
 	chanConn := make(chan net.Conn, 1)
 	//Listen on tls port
 	for {
@@ -81,7 +82,7 @@ func (pl *Platform) Start() error {
 			if conn.RemoteAddr().String() == fogAddress {
 				pl.handleProviderConnection(conn)
 			} else {
-				log.Printf("hecommplatform server: wrong connection: %v\n", conn)
+				log.Printf("hecommplatform server: wrong connection: %v != %v\n", conn.RemoteAddr().String(), fogAddress)
 			}
 		case <-pl.ctx.Done():
 			return nil
