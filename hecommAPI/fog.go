@@ -28,6 +28,15 @@ func (pl *Platform) RegisterNodes(nodes []hecomm.DBCNode) error {
 	}
 	defer conn.Close()
 
+	//Add nodes to hecomm platform server
+	for _, val := range nodes {
+		if val, ok := pl.Nodes[string(val.DevEUI)]; ok {
+			log.Printf("Node already present in hecomm platform server: %v!", string(val.DevEUI))
+		} else {
+			pl.Nodes[string(val.DevEUI)] = &nodeType{DevEUI: val.DevEUI}
+		}
+	}
+
 	for _, node := range nodes {
 		nodebytes, err := json.Marshal(node)
 		if err != nil {
