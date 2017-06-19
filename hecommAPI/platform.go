@@ -79,10 +79,18 @@ func (pl *Platform) Start() error {
 		//Check if connection available or context
 		select {
 		case conn := <-chanConn:
-			if conn.RemoteAddr().String() == fogAddress {
+			remote, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+			if err != nil {
+				log.Fatalf("Could not split address: %v, %v\n", conn.RemoteAddr().String(), err)
+			}
+			fog, _, err := net.SplitHostPort(fogAddress)
+			if err != nil {
+				log.Fatalf("Could not split address: %v, %v\n", fogAddress, err)
+			}
+			if remote == fog {
 				pl.handleProviderConnection(conn)
 			} else {
-				log.Printf("hecommplatform server: wrong connection: %v != %v\n", conn.RemoteAddr().String(), fogAddress)
+				log.Printf("hecommplatform server: wrong connection: %v != %v\n", remote, fog)
 			}
 		case <-pl.ctx.Done():
 			return nil
