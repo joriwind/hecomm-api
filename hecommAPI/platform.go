@@ -118,6 +118,8 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 			log.Fatalln("Unable to decipher bytes on hecomm channel!")
 		}
 
+		log.Printf("Received message, fPort: %v", message.FPort)
+
 		switch message.FPort {
 		case hecomm.FPortLinkReq:
 			//Link request from fog
@@ -302,7 +304,7 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 		if err != nil {
 			return err
 		}
-
+		log.Printf("Received message, fPort: %v\n", message.FPort)
 		switch message.FPort {
 		case hecomm.FPortLinkReq:
 			//Expecting response with provider identification
@@ -402,8 +404,16 @@ func alice(link *linkType, conn net.Conn, buf []byte) error {
 		return err
 	}
 
+	message, err := hecomm.GetMessage(buf[:n])
+	if err != nil {
+		return err
+	}
+	if message.FPort != hecomm.FPortLinkState {
+		return fmt.Errorf("Not the expected fPort != FPortLinkState")
+	}
+
 	//Recover Bob'pl public key
-	bobPubKey := dhkx.NewPublicKey(buf[:n])
+	bobPubKey := dhkx.NewPublicKey(message.Data)
 
 	//Compute shared key
 	k, err := g.ComputeKey(bobPubKey, priv)
