@@ -17,7 +17,7 @@ import (
 
 //FogType Defines the credentials of the fog
 const (
-	fogAddress string = "192.168.2.123:2000"
+	fogAddress string = "192.168.2.106:2000"
 )
 
 //RegisterNodes Register the nodes in the fog implementation
