@@ -54,6 +54,12 @@ func NewPlatform(ctx context.Context, address string, config *tls.Config, nodes 
 	return &pl, nil
 }
 
+//AddNode add another node for hecomm communication
+func (pl *Platform) AddNode(node []byte) {
+	log.Printf("Inserted node into hecommAPI: %v\n", string(node))
+	pl.Nodes[string(node)] = &nodeType{DevEUI: node}
+}
+
 //Start Start listening
 func (pl *Platform) Start() error {
 	listener, err := tls.Listen("tcp", pl.Address, pl.Config)
