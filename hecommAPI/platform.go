@@ -141,7 +141,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 			node, ok := pl.Nodes[string(lc.ProvDevEUI[:])]
 			//Check if valid node is found --> node.DevEUI not nil or something
 			if !ok {
-				log.Printf("hecommplatform server: handleconnection: could not find node\n")
+				log.Printf("hecommplatform server: handleconnection: could not find node: %v\n", string(lc.ProvDevEUI[:]))
 				rsp, err := hecomm.NewResponse(false)
 				if err != nil {
 					log.Fatalf("Failed to create response: error: %v\n", err)
