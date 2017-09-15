@@ -9,8 +9,8 @@ type CIType int
 
 //Defines the CIType's possible
 const (
-	CISixlowpan CIType = iota
-	CILorawan
+	CISixlowpan CIType = 10
+	CILorawan   CIType = 20
 )
 
 //DBCPlatform the struct used for passing information about the platform
