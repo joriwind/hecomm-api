@@ -359,6 +359,9 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 				if err != nil {
 					return err
 				}
+				//Link is set, return now
+				return nil
+
 			} else {
 				if link.contract.Linked == true {
 					return fmt.Errorf("Hecomm protocol Set link failed")
