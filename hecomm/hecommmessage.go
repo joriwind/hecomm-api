@@ -63,6 +63,7 @@ func GetMessage(buf []byte) (*Message, error) {
 	var message Message
 	err := json.Unmarshal(buf, &message)
 	if err != nil {
+		fmt.Printf("Unable to decompile message: %v\n", buf)
 		return &message, err
 	}
 	return &message, nil
@@ -130,6 +131,9 @@ func (m *Message) GetCommand() (*DBCommand, error) {
 		return &command, fmt.Errorf("Hecomm message: FPort not equal to DBCommand code: %v", m.FPort)
 	}
 	err := json.Unmarshal(m.Data, &command)
+	if err != nil {
+		fmt.Printf("Unable to decompile command: %v\n", m.Data)
+	}
 	return &command, err
 }
 
@@ -147,6 +151,9 @@ func (m *Message) GetLinkContract() (*LinkContract, error) {
 		return &link, fmt.Errorf("Hecomm message: FPort not equal to LinkContract code: %v", m.FPort)
 	}
 	err := json.Unmarshal(m.Data, &link)
+	if err != nil {
+		fmt.Printf("GetLinkContract: %+v", m)
+	}
 	return &link, err
 }
 
@@ -164,6 +171,9 @@ func (m *Message) GetResponse() (*Response, error) {
 		return &rsp, fmt.Errorf("Hecomm message: FPort not equal to response code: %v", m.FPort)
 	}
 	err := json.Unmarshal(m.Data, &rsp)
+	if err != nil {
+		fmt.Printf("Unable to decompile response: %v\n", m.Data)
+	}
 	return &rsp, err
 }
 
