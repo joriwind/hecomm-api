@@ -17,6 +17,61 @@ const (
 	infType int = 1111
 )
 
+func TestConnection(t *testing.T) {
+	ret := make(chan bool, 1)
+	b := make([]byte, 10000)
+	fmt.Printf("Using IP: %v\n", getLocalIP())
+	list, err := net.Listen("tcp", getLocalIP()+":1264")
+	if err != nil {
+		fmt.Printf("Err: %v\n", err)
+		return
+	}
+	defer list.Close()
+
+	go func(ret chan bool) {
+		buf := make([]byte, 88000)
+		connection, err := list.Accept()
+		defer connection.Close()
+		if err != nil {
+			fmt.Printf("Err: %v\n", err)
+			return
+		}
+		for {
+			n, err := connection.Read(buf)
+			if err != nil {
+				fmt.Printf("Connection resulted: %v\n", err)
+				break
+			}
+			fmt.Printf("Received %v bytes\n", n)
+		}
+		fmt.Printf("Stopped listening\n")
+		ret <- true
+	}(ret)
+
+	conn, err := net.Dial("tcp", getLocalIP()+":1264")
+	defer conn.Close()
+	if err != nil {
+		fmt.Printf("Err: %v\n", err)
+		return
+	}
+	n, err := conn.Write(b)
+	fmt.Printf("Written: %v bytes\n", n)
+	n, err = conn.Write(b[:n/2])
+	fmt.Printf("Written: %v bytes\n", n)
+	n, err = conn.Write(b[:n/2])
+	fmt.Printf("Written: %v bytes\n", n)
+	n, err = conn.Write(b[:n/2])
+	fmt.Printf("Written: %v bytes\n", n)
+	if err != nil {
+		fmt.Printf("Err: %v\n", err)
+		return
+	}
+
+	conn.Close()
+
+	<-ret
+}
+
 func TestSetup(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -75,6 +130,7 @@ func TestSetup(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unable to request Link: %v\n", err)
 	}
+
 }
 
 func setupPlatform(ctx context.Context, ip string, tlsc *tls.Config) (*Platform, error) {

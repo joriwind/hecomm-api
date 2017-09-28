@@ -5,11 +5,11 @@ import (
 	"crypto/tls"
 	"log"
 	"net"
+	"time"
 
 	"fmt"
 
 	"github.com/joriwind/hecomm-api/hecomm"
-	"github.com/monnand/dhkx"
 )
 
 const (
@@ -44,6 +44,7 @@ func NewPlatform(ctx context.Context, address string, config *tls.Config, nodes 
 
 	pl.ctx = ctx
 	pl.Address = address
+	//config.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA}
 	pl.Config = config
 	pl.Nodes = make(map[string]*nodeType)
 	for i, val := range nodes {
@@ -108,7 +109,7 @@ func (pl *Platform) Start() error {
 }
 
 func (pl *Platform) handleProviderConnection(conn net.Conn) {
-	buf := make([]byte, 2048)
+	buf := make([]byte, 4048)
 
 	//The to be created link
 	var link linkType
@@ -125,6 +126,7 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 		}
 
 		log.Printf("Received message, fPort: %v", message.FPort)
+		log.Printf("Message: %+v\n", message)
 
 		switch message.FPort {
 		case hecomm.FPortLinkReq:
@@ -192,14 +194,15 @@ func (pl *Platform) handleProviderConnection(conn net.Conn) {
 			}
 			link.contract = *lc
 
-		case hecomm.FPortLinkState:
-			if link.contract.ProvDevEUI == nil {
-				log.Printf("The link protocol has not started yet?: %v\n", link)
-			}
-			err := bob(&link, conn, *message)
+			err = pl.bob(&link, conn, *message)
 			if err != nil {
 				log.Printf("DH protocol error: %v\n", err)
 				break
+			}
+
+		case hecomm.FPortLinkState:
+			if link.contract.ProvDevEUI == nil {
+				log.Printf("The link protocol has not started yet?: %v\n", link)
 			}
 
 		case hecomm.FPortLinkSet:
@@ -278,7 +281,7 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 	}
 	defer conn.Close()
 
-	buf := make([]byte, 2048)
+	buf := make([]byte, 4048)
 
 	//The to be created link
 	link := linkType{
@@ -302,6 +305,7 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 	for {
 		//Wait for response
 		n, err := conn.Read(buf)
+		fmt.Printf("Connection state: %+v\n", conn.ConnectionState())
 		if err != nil {
 			return err
 		}
@@ -311,6 +315,7 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 			return err
 		}
 		log.Printf("Received message, fPort: %v\n", message.FPort)
+		log.Printf("Message: %+v\n", message)
 		switch message.FPort {
 		case hecomm.FPortLinkReq:
 			//Expecting response with provider identification
@@ -325,7 +330,7 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 			link.contract.ProvDevEUI = lc.ProvDevEUI
 
 			//Startup PK
-			err = alice(&link, conn, buf)
+			err = pl.alice(&link, conn, buf)
 			if err != nil {
 				return err
 			}
@@ -377,9 +382,40 @@ func (pl *Platform) RequestLink(deveui []byte, infType int) error {
 }
 
 //alice Initiator side from DH perspective
-func alice(link *linkType, conn net.Conn, buf []byte) error {
+func (pl Platform) alice(link *linkType, conn net.Conn, buf []byte) error {
+	fmt.Printf("Alice started\n")
 	//Get default group
-	g, err := dhkx.GetGroup(0)
+
+	/* var keywriter = keyWriter{}
+	tlsc := tls.Config{
+		KeyLogWriter: keywriter,
+	}
+	tls.Client(conn, pl.Config) */
+	keychan := make(chan []byte)
+
+	keylistener := newKeyListener(keychan)
+	pl.Config.KeyLogWriter = keylistener
+	pl.Config.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}
+
+	lc := newLinkstConn(conn)
+	keyconn := tls.Client(lc, pl.Config)
+
+	err := keyconn.Handshake()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Alice: finished handshake: %+v\n", keyconn.ConnectionState())
+
+	select {
+	case key := <-keychan:
+		copy(link.osSKey[:], key[:KeySize])
+		fmt.Printf("Alice's key is set: %x\n", key[:])
+	case <-time.After(time.Second * 2):
+		return fmt.Errorf("Key establishment timed out")
+	}
+	return nil
+
+	/* g, err := dhkx.GetGroup(0)
 	if err != nil {
 		//log.Fatalf("Could not create group(DH): %v\n", err)
 		return err
@@ -433,12 +469,48 @@ func alice(link *linkType, conn net.Conn, buf []byte) error {
 	//Get the key in []byte form
 	key := k.Bytes()
 	copy(link.osSKey[:], key[:KeySize])
-	return nil
+	return nil */
 }
 
 //bob Receiver side form DH perspective, linkstate message already received
-func bob(link *linkType, conn net.Conn, message hecomm.Message) error {
-	g, err := dhkx.GetGroup(0)
+func (pl Platform) bob(link *linkType, conn net.Conn, message hecomm.Message) error {
+	fmt.Printf("Bob started\n")
+	keychan := make(chan []byte)
+
+	keylistener := newKeyListener(keychan)
+	pl.Config.KeyLogWriter = keylistener
+	pl.Config.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}
+
+	lc := newLinkstConn(conn)
+	//_ = tls.Client(lc, pl.Config)
+	keyconn := tls.Server(lc, pl.Config)
+
+	err := keyconn.Handshake()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Bob: finished handshake: %+v\n", keyconn.ConnectionState())
+
+	/* var state tls.ConnectionState
+	state = keyconn.ConnectionState()
+	for state.HandshakeComplete == false {
+		time.Sleep(time.Microsecond * 10)
+	} */
+	fmt.Printf("Handshake completed\n")
+	/* err := keyconn.Handshake()
+	if err != nil {
+		return err
+	} */
+
+	select {
+	case key := <-keychan:
+		copy(link.osSKey[:], key[:KeySize])
+		fmt.Printf("Bob's key is set: %x\n", key[:])
+	case <-time.After(time.Second * 2):
+		return fmt.Errorf("Key establishment timed out")
+	}
+	return nil
+	/* g, err := dhkx.GetGroup(0)
 	if err != nil {
 		//log.Fatalf("Could not create group(DH): %v\n", err)
 		return err
@@ -485,5 +557,5 @@ func bob(link *linkType, conn net.Conn, message hecomm.Message) error {
 	//Get the key in []byte form
 	key := k.Bytes()
 	copy(link.osSKey[:], key[:KeySize])
-	return nil
+	return nil */
 }
