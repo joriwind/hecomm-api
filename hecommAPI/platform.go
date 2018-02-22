@@ -45,6 +45,7 @@ func NewPlatform(ctx context.Context, address string, config *tls.Config, nodes 
 	pl.ctx = ctx
 	pl.Address = address
 	//config.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA}
+	config.ServerName = "192.168.2.1"
 	pl.Config = config
 	pl.Nodes = make(map[string]*nodeType)
 	for i, val := range nodes {
