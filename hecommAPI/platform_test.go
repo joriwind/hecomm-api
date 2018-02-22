@@ -195,7 +195,7 @@ func loadCertificate(pathCert, pathKey, pathCacert string) *tls.Config {
 		Certificates:       []tls.Certificate{cert},
 		RootCAs:            caCertPool,
 		ClientCAs:          caCertPool,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: false,
 	}
 	return config
 }
